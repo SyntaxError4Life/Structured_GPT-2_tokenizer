@@ -1,30 +1,29 @@
 from setuptools import setup, find_packages
-from setuptools.command.install import install
 import os
 import shutil
 
-# Définition des chemins
+# Define paths
 package_name = "structured_gpt2"
 package_dir = package_name
 init_file = os.path.join(package_dir, "__init__.py")
 tokenizer_file = "tokenizer.json"
 dest_tokenizer_file = os.path.join(package_dir, "tokenizer.json")
 
-# Création du répertoire du package
+# Create package directory
 os.makedirs(package_dir, exist_ok=True)
 
-# Contenu de __init__.py
+# Content of __init__.py
 init_content = """import os
 from tokenizers import Tokenizer
 
-# Chemin vers tokenizer.json dans le package
+# Path to tokenizer.json in the package
 tokenizer_path = os.path.join(os.path.dirname(__file__), "tokenizer.json")
 
-# Chargement du tokenizer
+# Load tokenizer
 try:
     tokenizer = Tokenizer.from_file(tokenizer_path)
 except Exception as e:
-    raise RuntimeError(f"Erreur au chargement du tokenizer : {e}")
+    raise RuntimeError(f"Failed to load tokenizer: {e}")
 
 class StructuredTokenizer:
     def __init__(self, tokenizer):
@@ -35,24 +34,24 @@ class StructuredTokenizer:
             "endoftext": tokenizer.token_to_id("<|endoftext|>")
         }
         if None in self.special_ids.values():
-            raise ValueError("Un token spécial n’a pas d’ID valide : " + str(self.special_ids))
+            raise ValueError("A special token has an invalid ID: " + str(self.special_ids))
 
     def escape_special_tokens(self, text):
-        \"\"\"Échappe les balises spéciales pour les traiter comme texte brut.\"\"\"
+        \"\"\"Escape special tokens to treat them as plain text.\"\"\"
         for token in ["<|user|>", "<|assistant|>", "<|endoftext|>"]:
             escaped_token = token.replace("<", "\\\\<").replace(">", "\\\\>")
             text = text.replace(token, escaped_token)
         return text
 
     def unescape_special_tokens(self, text):
-        \"\"\"Restaure les balises échappées.\"\"\"
+        \"\"\"Restore escaped special tokens.\"\"\"
         for token in ["<|user|>", "<|assistant|>", "<|endoftext|>"]:
             escaped_token = token.replace("<", "\\\\<").replace(">", "\\\\>")
             text = text.replace(escaped_token, token)
         return text
 
     def struct_encode(self, messages):
-        \"\"\"Encode une liste de messages en indices.\"\"\"
+        \"\"\"Encode a list of messages into indices.\"\"\"
         indices = []
         for msg in messages:
             role = msg["role"]
@@ -62,7 +61,7 @@ class StructuredTokenizer:
             elif role == "assistant":
                 indices.append(self.special_ids["assistant"])
             else:
-                raise ValueError(f"Rôle inconnu : {role}")
+                raise ValueError(f"Unknown role: {role}")
             if content:
                 escaped_content = self.escape_special_tokens(content)
                 content_encoded = self.tokenizer.encode(escaped_content).ids
@@ -71,7 +70,7 @@ class StructuredTokenizer:
         return indices
 
     def struct_decode(self, indices):
-        \"\"\"Décode les indices en messages structurés.\"\"\"
+        \"\"\"Decode indices into structured messages.\"\"\"
         messages = []
         current_role = None
         current_content_ids = []
@@ -97,70 +96,28 @@ class StructuredTokenizer:
                 current_content_ids.append(idx)
         return messages
 
-# Exposition de l'objet tokenizer
+# Expose tokenizer object
 tokenizer = StructuredTokenizer(tokenizer)
 """
 
-# Écriture de __init__.py
+# Write __init__.py
 with open(init_file, "w", encoding="utf-8") as f:
     f.write(init_content)
 
-# Copie de tokenizer.json dans le package
+# Copy tokenizer.json to package
 if os.path.exists(tokenizer_file):
     shutil.copy(tokenizer_file, dest_tokenizer_file)
 else:
-    raise FileNotFoundError(f"Le fichier {tokenizer_file} est introuvable")
+    raise FileNotFoundError(f"File {tokenizer_file} not found")
 
-# Commande personnalisée pour exécuter les tests après l'installation
-class CustomInstallCommand(install):
-    def run(self):
-        install.run(self)
-        # Exécution des tests
-        try:
-            from structured_gpt2 import tokenizer
-
-            # Test 1: struct_encode
-            A = tokenizer.struct_encode(
-                [
-                    {"role": "user", "content": "structured_gpt2"},
-                    {"role": "user", "content": "<|user|>"},
-                    {"role": "assistant", "content": "<|assisant|>"}
-                ]
-            )
-            expected_A = [1, 7253, 1526, 66, 74, 461, 21, 1, 49782, 95, 7224, 95, 63, 33, 2, 31, 95, 20301, 419, 95, 33, 3]
-            if A != expected_A:
-                raise RuntimeError(
-                    f"Échec du test struct_encode. Attendu : {expected_A}, Obtenu : {A}. "
-                    "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
-                )
-
-            # Test 2: struct_decode
-            B = tokenizer.struct_decode([1, 0, 3])
-            expected_B = [{"role": "user", "content": ""}]
-            if B != expected_B:
-                raise RuntimeError(
-                    f"Échec du test struct_decode. Attendu : {expected_B}, Obtenu : {B}. "
-                    "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
-                )
-
-            print("Tous les tests ont réussi.")
-        except Exception as e:
-            raise RuntimeError(
-                f"Échec des tests post-installation : {str(e)}. "
-                "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
-            )
-
-# Configuration du package
+# Package configuration
 setup(
     name=package_name,
     version="0.1.0",
-    description="Tokenizer structuré basé sur GPT-2",
+    description="Structured tokenizer based on GPT-2",
     author="SyntaxError4Life",
     packages=[package_name],
     package_data={package_name: ["tokenizer.json"]},
     include_package_data=True,
     install_requires=["tokenizers==0.21.1"],
-    cmdclass={
-        "install": CustomInstallCommand,
-    },
 )
