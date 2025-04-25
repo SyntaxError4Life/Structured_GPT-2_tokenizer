@@ -5,13 +5,13 @@ from tokenizers.normalizers import BertNormalizer
 from tokenizers.processors import TemplateProcessing
 from huggingface_hub import hf_hub_download
 
-# Étape 1 : Charger ou recréer le tokenizer
+# Step 1: Load or recreate the tokenizer
 output_file = "tokenizer.json"
 try:
     tokenizer = Tokenizer.from_file(output_file)
-    print("Tokenizer chargé depuis", output_file)
+    print("Tokenizer loaded from", output_file)
 except Exception as e:
-    print(f"Erreur au chargement ({e}). Recréation du tokenizer...")
+    print(f"Error loading tokenizer ({e}). Recreating tokenizer...")
     repo_id = "openai-community/gpt2"
     vocab_file = hf_hub_download(repo_id=repo_id, filename="vocab.json")
     merges_file = hf_hub_download(repo_id=repo_id, filename="merges.txt")
@@ -47,9 +47,9 @@ except Exception as e:
         special_tokens=[(token, new_vocab[token]) for token in special_tokens]
     )
     tokenizer.save(output_file)
-    print(f"Tokenizer recréé et sauvegardé dans {output_file}")
+    print(f"Tokenizer recreated and saved to {output_file}")
 
-# Étape 2 : Classe pour gérer les messages structurés
+# Step 2: Class to handle structured messages
 class StructuredTokenizer:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
@@ -59,24 +59,24 @@ class StructuredTokenizer:
             "endoftext": tokenizer.token_to_id("<|endoftext|>")
         }
         if None in self.special_ids.values():
-            raise ValueError("Un token spécial n’a pas d’ID valide : " + str(self.special_ids))
+            raise ValueError("A special token has an invalid ID: " + str(self.special_ids))
 
     def escape_special_tokens(self, text):
-        """Échappe les balises spéciales dans le contenu pour les traiter comme texte brut."""
+        """Escape special tokens in the content to treat them as plain text."""
         for token in ["<|user|>", "<|assistant|>", "<|endoftext|>"]:
             escaped_token = token.replace("<", "\\<").replace(">", "\\>")
             text = text.replace(token, escaped_token)
         return text
 
     def unescape_special_tokens(self, text):
-        """Restaure les balises échappées dans le contenu."""
+        """Restore escaped tags in the content."""
         for token in ["<|user|>", "<|assistant|>", "<|endoftext|>"]:
             escaped_token = token.replace("<", "\\<").replace(">", "\\>")
             text = text.replace(escaped_token, token)
         return text
 
     def struct_encode(self, messages):
-        """Encode une liste de messages en indices."""
+        """Encode a list of messages into indices."""
         indices = []
         for msg in messages:
             role = msg["role"]
@@ -86,9 +86,8 @@ class StructuredTokenizer:
             elif role == "assistant":
                 indices.append(self.special_ids["assistant"])
             else:
-                raise ValueError(f"Rôle inconnu : {role}")
+                raise ValueError(f"Unknown role: {role}")
             if content:
-                # Échapper les balises spéciales pour les traiter comme texte brut
                 escaped_content = self.escape_special_tokens(content)
                 content_encoded = self.tokenizer.encode(escaped_content).ids
                 indices.extend(content_encoded)
@@ -96,7 +95,7 @@ class StructuredTokenizer:
         return indices
 
     def struct_decode(self, indices):
-        """Décode les indices en messages structurés."""
+        """Decode indices into structured messages."""
         messages = []
         current_role = None
         current_content_ids = []
@@ -122,51 +121,51 @@ class StructuredTokenizer:
                 current_content_ids.append(idx)
         return messages
 
-# Étape 3 : Tests exhaustifs
+# Step 3: Comprehensive tests
 def test_tokenizer():
     struct_tokenizer = StructuredTokenizer(tokenizer)
     
-    # Test 1 : Messages avec balises dans le contenu
+    # Test 1: Messages with tags in content
     messages = [
-        {"role": "user", "content": "Salut, j’ai écrit <|user|> dans mon texte"},
-        {"role": "assistant", "content": "Pas de souci, c’est bien du texte brut !"}
+        {"role": "user", "content": "Hi, I wrote <|user|> in my text"},
+        {"role": "assistant", "content": "No issue, it’s plain text!"}
     ]
-    print("\nTest 1 : Balises dans le contenu")
+    print("\nTest 1: Tags in content")
     encoded = struct_tokenizer.struct_encode(messages)
-    print("Indices encodés :", encoded)
+    print("Encoded indices:", encoded)
     decoded = struct_tokenizer.struct_decode(encoded)
-    print("Messages décodés :", decoded)
+    print("Decoded messages:", decoded)
     
-    # Test 2 : Messages multiples
+    # Test 2: Multiple messages
     messages = [
-        {"role": "user", "content": "Bonjour, comment vas-tu ?"},
-        {"role": "assistant", "content": "Je vais bien, merci ! Et toi ?"},
-        {"role": "user", "content": "Super, merci !"}
+        {"role": "user", "content": "Hello, how are you?"},
+        {"role": "assistant", "content": "I'm good, thanks! And you?"},
+        {"role": "user", "content": "Great, thanks!"}
     ]
-    print("\nTest 2 : Messages multiples")
+    print("\nTest 2: Multiple messages")
     encoded = struct_tokenizer.struct_encode(messages)
-    print("Indices encodés :", encoded)
+    print("Encoded indices:", encoded)
     decoded = struct_tokenizer.struct_decode(encoded)
-    print("Messages décodés :", decoded)
+    print("Decoded messages:", decoded)
     
-    # Test 3 : Message unique
-    single_message = [{"role": "assistant", "content": "Ceci est un test."}]
-    print("\nTest 3 : Message unique")
+    # Test 3: Single message
+    single_message = [{"role": "assistant", "content": "This is a test."}]
+    print("\nTest 3: Single message")
     encoded = struct_tokenizer.struct_encode(single_message)
-    print("Indices encodés :", encoded)
+    print("Encoded indices:", encoded)
     decoded = struct_tokenizer.struct_decode(encoded)
-    print("Messages décodés :", decoded)
+    print("Decoded messages:", decoded)
     
-    # Test 4 : Messages vides
+    # Test 4: Empty messages
     empty_message = [
         {"role": "user", "content": ""},
-        {"role": "assistant", "content": "Réponse vide"}
+        {"role": "assistant", "content": "Empty response"}
     ]
-    print("\nTest 4 : Messages vides")
+    print("\nTest 4: Empty messages")
     encoded = struct_tokenizer.struct_encode(empty_message)
-    print("Indices encodés :", encoded)
+    print("Encoded indices:", encoded)
     decoded = struct_tokenizer.struct_decode(encoded)
-    print("Messages décodés :", decoded)
+    print("Decoded messages:", decoded)
 
-# Lancer les tests
+# Run tests
 test_tokenizer()
