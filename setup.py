@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
 import os
 import shutil
 
@@ -110,6 +111,45 @@ if os.path.exists(tokenizer_file):
 else:
     raise FileNotFoundError(f"Le fichier {tokenizer_file} est introuvable")
 
+# Commande personnalisée pour exécuter les tests après l'installation
+class CustomInstallCommand(install):
+    def run(self):
+        install.run(self)
+        # Exécution des tests
+        try:
+            from structured_gpt2 import tokenizer
+
+            # Test 1: struct_encode
+            A = tokenizer.struct_encode(
+                [
+                    {"role": "user", "content": "structured_gpt2"},
+                    {"role": "user", "content": "<|user|>"},
+                    {"role": "assistant", "content": "<|assisant|>"}
+                ]
+            )
+            expected_A = [1, 7253, 1526, 66, 74, 461, 21, 1, 49782, 95, 7224, 95, 63, 33, 2, 31, 95, 20301, 419, 95, 33, 3]
+            if A != expected_A:
+                raise RuntimeError(
+                    f"Échec du test struct_encode. Attendu : {expected_A}, Obtenu : {A}. "
+                    "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
+                )
+
+            # Test 2: struct_decode
+            B = tokenizer.struct_decode([1, 0, 3])
+            expected_B = [{"role": "user", "content": ""}]
+            if B != expected_B:
+                raise RuntimeError(
+                    f"Échec du test struct_decode. Attendu : {expected_B}, Obtenu : {B}. "
+                    "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
+                )
+
+            print("Tous les tests ont réussi.")
+        except Exception as e:
+            raise RuntimeError(
+                f"Échec des tests post-installation : {str(e)}. "
+                "Veuillez signaler le problème sur https://github.com/SyntaxError4Life/Structured_GPT-2_tokenizer"
+            )
+
 # Configuration du package
 setup(
     name=package_name,
@@ -119,4 +159,8 @@ setup(
     packages=[package_name],
     package_data={package_name: ["tokenizer.json"]},
     include_package_data=True,
+    install_requires=["tokenizers==0.21.1"],
+    cmdclass={
+        "install": CustomInstallCommand,
+    },
 )
